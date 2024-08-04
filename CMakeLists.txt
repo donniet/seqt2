@@ -8,7 +8,9 @@ find_package(OpenCL REQUIRED)
 
 include_directories(include)
 
-add_library(seqt src/seqt.cpp)
+file(GLOB HEADER_LIST CONFIGURE_DEPENDS "${seqt2_SOURCE_DIR}/include/*.hpp")
+
+add_library(seqt src/seqt.cpp ${HEADER_LIST})
 target_compile_definitions(seqt PRIVATE BOOST_COMPUTE_DEBUG_KERNEL_COMPILATION)
 target_link_libraries(seqt ${BOOST_LIBRARIES} ${OpenCL_LIBRARIES})
 

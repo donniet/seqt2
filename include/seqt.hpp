@@ -73,7 +73,7 @@ public:
     void read(wchar_t c);
 
     seqt();
-};
+}; 
 
     
 

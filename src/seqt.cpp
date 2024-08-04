@@ -35,7 +35,7 @@ long seqt::get_char_index(wchar_t c) {
     fill_n(_tracked.begin() + index, 1, 0, _queue);
 
     return index;
-}
+} 
 
 BOOST_COMPUTE_FUNCTION(long, flag_tracked, (long x), {
     if(x == 0)
