@@ -1,0 +1,37 @@
+
+tracked:
+ 0 1 2 3 4 5 6 7 8 // ids
+-9-1-5-0-1-2-0-0 0 // how far back we say this sequence
+
+current:
+0 1 2 3 // ids
+6 3 8 7 // current indexes
+1 1 2 5 // lengths (i don't think they can have two lengths of one, but they can have currents that are the same length...)
+1 2 4 9 // scanned
+
+nexts:
+0 1 2 3 4 5 6 7 8 // ids
+0 0 3 0 0 2 0 0 0 // begin
+0 2 4 0 2 3 0 0 0 // end
+
+scratch:
+0 1 2 3 4 5 6 7 8 // ids
+0 2 1 0 2 1 0 0 0 
+0 2 3 3 5 6 6 6 6 // scanned
+
+finds:
+0 1 2 3 4 5 // ids
+1 1 2 4 4 5 // prev (upper_bound(id))
+2 2 3 5 5 6 // scanned[prev]
+            // which finds id is the first with this value?
+0 0 2 3 3 5 // scanned[prev-1] will be the count of all the finds before this one   
+0 0 2 3 3 5 // fir == first index in finds of scanned[prev]
+0 1 0 0 1 0 // id - fir
+0 0 3 0 0 2 // next_begin[prev]
+-----------
+0 1 3 0 1 2 // + cur in current
+6 3 7 6 3 8 // next (current[cur])
+
+
+
+

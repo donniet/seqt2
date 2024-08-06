@@ -8,6 +8,7 @@
 #include <iterator>
 #include <vector>
 #include <algorithm>
+#include <string>
 
 using namespace boost::compute;
 
@@ -54,7 +55,7 @@ public:
     // -1 means tracked at one character previous, -2 is two, etc.
     vector<long> _tracked;
 
-    long _total;
+    long _total;  
 
     map<wchar_t, long> _char_index;
     map<long, wchar_t> _index_char;
@@ -63,15 +64,20 @@ public:
 
     vector<long> pack(vector<long> & data, function<long(long)> pred);
     void find_nexts(vector<long> & sorted_lengths, vector<long> & nexts_begin, vector<long> & nexts_end);
-    void collect_finds(vector<long> & scratch, vector<long> & current, vector<long2_> & found);
+    void collect_finds(vector<long> & nexts_begin, vector<long> & scratch, vector<long> & current, vector<long2_> & found);
     void mark_new_or_increment_count(vector<long2_> & found, vector<long> & scratch);
     void initialize_newly_found_sequences(vector<long> & new_find_indices, vector<long2_> & found);
 
     template<typename T>
-    void print(vector<T> & v);
+    void print(vector<T> & v); 
 
     void read(wchar_t c);
+    void print_all();
 
+    void print_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
+        std::map<long, std::wstring> & cache);
+    std::wstring write_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
+        std::map<long, std::wstring> & cache);
     seqt();
 }; 
 

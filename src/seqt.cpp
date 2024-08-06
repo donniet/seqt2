@@ -49,11 +49,23 @@ BOOST_COMPUTE_FUNCTION(long, unflag_tracked, (long x), {
     return x;
 });
 
+BOOST_COMPUTE_FUNCTION(bool, long2_compare, (long2_ a, long2_ b), {
+    if(a.x < b.x) return true;
+    if(b.x < a.x) return false;
+    if(a.y < b.y) return true;
+    return false;
+});
+
 void seqt::read(wchar_t c) {
     // subtract one from each tracked reference
     transform(_tracked.begin(), _tracked.end(), _tracked.begin(), _1 - 1, _queue);
 
+
+    cout << "lengths:\n";
+    print(_lengths);
+
     // find the index of the current character
+    // TODO: handle duplicate sequences
     long index = get_char_index(c); 
 
 
@@ -66,28 +78,50 @@ void seqt::read(wchar_t c) {
     vector<long2_> found(0, _context);
 
     for(;;) {
-        // get all the current sequences
+        cout << "tracked:\n";
+        print(_tracked);
+        // STEP 0: get all the current sequences
         current = pack(_tracked, _1 == 0);
 
         // mark all the current ones to a positive number to flag them as accounted for
         transform(_tracked.begin(), _tracked.end(), _tracked.begin(), flag_tracked, _queue);
 
+        // STEP 1: sort all current sequences by length
         // allocate space for the current lengths
         current_lengths = vector<long>(current.size(), _context);
 
         // gather the lengths of the current items into our allocated space
-        gather(_lengths.begin(), _lengths.end(), current.begin(), current_lengths.begin(), _queue);
-
+        gather(current.begin(), current.end(), _lengths.begin(), current_lengths.begin(), _queue);
 
         // sort the current indices by the lengths
         sort_by_key(current_lengths.begin(), current_lengths.end(), current.begin(), _queue);
 
+        cout << "prevs and nexts:\n";
+        print(_prevs);
+        print(_nexts);
+
+        cout << "current:\n";
+        print(current);
+        print(current_lengths);
+
+        // STEP 2: Find potentially new sequences by looking how far back we saw
+        //   a given sequence and marking in our sorted current lengths the possible
+        //   subsequent sequences
         // now go through and find new sequences based on the current lengths and the tracked numbers
+        // these index the current vector which gives us the id:
+        //   current[nexts_begin[i] ... nexts_end[i])
+        // are all the potential nexts for sequence i
         nexts_begin = vector<long>(_total, _context);
         nexts_end = vector<long>(_total, _context);
 
-        find_nexts(current_lengths, nexts_begin, nexts_end);
 
+        find_nexts(current_lengths, nexts_begin, nexts_end);
+        cout << "nexts:" << "\n";
+        print(nexts_begin);
+        print(nexts_end);
+
+
+        // STEP 3: Tally up all our new potential sequences so we can enumerate them
         // now count up how many we think we have
         long found_count;
         scratch = vector<long>(_total, _context);
@@ -97,29 +131,39 @@ void seqt::read(wchar_t c) {
 
         // add them all up
         inclusive_scan(scratch.begin(), scratch.end(), scratch.begin(), _queue);
+        cout << "scratch:\n";
+        print(scratch);
         copy_n(scratch.end() - 1, 1, &found_count, _queue);
 
         std::cout << "found: " << found_count << std::endl;
         if(found_count == 0)
             break;
 
+        // STEP 4: Enumerate all potential new sequences and sort the list of them by (prev,next)
         // now allocate memory to see if these are new or not
         found.resize(found_count, _queue);
         
 
         // collect all our finds into prev and next arrays
-        collect_finds(scratch, current, found);
+        collect_finds(nexts_begin, scratch, current, found);
 
         // sort it to use it as an index
-        sort(found.begin(), found.end(), _queue);
+        sort(found.begin(), found.end(), long2_compare, _queue);
 
+        // STEP 5: Lookup each of our existing sequences in this list of potential new ones
+        //   mark the ones that are new, and increment counts of the ones we alread have
         // resize our scratch vector to see if we already have any of these finds
         scratch.resize(found_count, _queue);
-        fill(scratch.begin(), scratch.end(), 0, _queue);
+        fill(scratch.begin(), scratch.end(), 1, _queue);
 
         // mark the indices in scratch for new ones, and increment the count for existing ones
         mark_new_or_increment_count(found, scratch);
 
+        cout << "found and scratch after mark:\n";
+        print(found);
+        print(scratch);
+
+        // STEP 6: Collect all the new sequences and add them to our list to be tracked
         // now we have indices to all new sequences and existing ones
         new_find_indices = pack(scratch, _1 == 1);
 
@@ -140,7 +184,7 @@ void seqt::read(wchar_t c) {
     }
 
     // now set all the flaged ones back to zero before the next char is read in
-        transform(_tracked.begin(), _tracked.end(), _tracked.begin(), unflag_tracked, _queue);
+    transform(_tracked.begin(), _tracked.end(), _tracked.begin(), unflag_tracked, _queue);
 
     // look at the sequences we are tracking and see if any of them are followed by this character
     // mark those as tracked and increment their count.
@@ -149,15 +193,85 @@ void seqt::read(wchar_t c) {
 
 }
 
-void seqt::collect_finds(vector<long> & scratch, vector<long> & current, vector<long2_> & found) {
+std::wstring seqt::write_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
+    std::map<long, std::wstring> & cache)
+{
+    std::wstring str;
+
+    // index 0 is always the empty string
+    if(i == 0) 
+        return str;
+    
+    auto j = cache.find(i);
+    if(j != cache.end()) {
+        return j->second;
+    }
+
+    // atom
+    if(prev[i] == 0 && next[i] == 0) {
+        wchar_t c = _index_char[i];
+        str.resize(1);
+        str[0] = c;
+        cache[i] = str;
+        return str;
+    }
+
+    std::wstring p, n;
+
+    // TODO: make this stack based instead of recursive later
+    p = write_by_index(prev[i], prev, next, cache);
+    n = write_by_index(next[i], prev, next, cache);
+
+    str = p + n;
+    cache[i] = str;
+    return str;
+}
+
+void seqt::print_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
+    std::map<long, std::wstring> & cache) 
+{
+    std::wstring str;
+
+    auto j = cache.find(i);
+
+    if(j == cache.end()) {
+        std::wstring str = write_by_index(i, prev, next, cache);
+        // cache.insert({i, str}); // shouldn't be needed....
+    } else {
+        str = j->second;
+    }
+
+    std::wcout << "\"" << str << "\"" << "\n";
+}
+
+void seqt::print_all() {
+    print(_prevs);
+    print(_nexts);
+
+    std::vector<long> prev(_total);
+    std::vector<long> next(_total);
+
+    copy(_prevs.begin(), _prevs.end(), prev.begin(), _queue);
+    copy(_nexts.begin(), _nexts.end(), next.begin(), _queue);
+
+    std::map<long, std::wstring> cache;
+
+    for(long i = 0; i < _total; i++) {
+        print_by_index(i, prev, next, cache);
+    }
+    std::cout << std::endl;
+}
+
+void seqt::collect_finds(vector<long> & nexts_begin, vector<long> & scratch, vector<long> & current, vector<long2_> & found) {
     long local_size = _collect_finds_kernel.get_work_group_info<long>(_device, CL_KERNEL_WORK_GROUP_SIZE);
     long operational_size = calc_operational_size(found.size(), local_size);
 
-    _collect_finds_kernel.set_arg(0, scratch);
-    _collect_finds_kernel.set_arg(1, (long)scratch.size());
-    _collect_finds_kernel.set_arg(2, current);
-    _collect_finds_kernel.set_arg(3, found);
-    _collect_finds_kernel.set_arg(4, (long)found.size());
+    _collect_finds_kernel.set_arg(0, nexts_begin);
+    _collect_finds_kernel.set_arg(1, scratch);
+    _collect_finds_kernel.set_arg(2, (long)scratch.size());
+    _collect_finds_kernel.set_arg(3, current);
+    _collect_finds_kernel.set_arg(4, found);
+    _collect_finds_kernel.set_arg(5, (long)found.size());
 
     event e = _queue.enqueue_1d_range_kernel(_collect_finds_kernel, 0, operational_size, local_size);
     e.wait();

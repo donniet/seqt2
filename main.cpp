@@ -82,9 +82,11 @@ int main(void)
 
     std::string test = "blahblahblahblah";
 
+
     for(auto c : test) {
         s.read(c);
     }
+    s.print_all();
 
     for(;;) {
         c = wcin.get();

@@ -75,7 +75,7 @@ kernel void find_nexts(
     global long * nexts_end) 
 {
     const long gid = get_global_id(0);
-    if(gid > total)
+    if(gid >= total)
         return;
 
     // is the previous one behind by the length of the current ones?
@@ -89,15 +89,18 @@ kernel void find_nexts(
 }
 
 kernel void collect_finds(
+    global long * nexts_begin,
     global long * scratch,
-    long scratch_size,
+    long total,
     global long * current,
     global long2 * found,
     long found_count
 ) {
     const long gid = get_global_id(0);
-    if(gid > found_count)
+    if(gid >= found_count)
         return;
+
+    // gid is the index of this find from the sum of scratch
 
     // search through the sorted scratch vector to get the index of prev
 
@@ -105,17 +108,17 @@ kernel void collect_finds(
     // because gid ranges continuously from [0,found_count)
     // and scratch is an inclusive_scan with each step being
     // the length of the next finds
-    long found_end = upper_bound(gid, scratch, scratch_size);
+    long prev = upper_bound(gid, scratch, total);
+    
+    long first_find = scratch[prev-1]; // will prev always be > 0?
 
-    // now we can get the first index of this prev by going back one
-    long gid_first = scratch[found_end-1];
+    // our next is the offset of where our nexts begin
+    // by our gid from the first find
+    long next = current[nexts_begin[prev] + gid - first_find];
 
-    // found_prev is going to be the lower bound of this gid_first
-    found[gid].s0 = lower_bound(gid_first, scratch, scratch_size);
-
-    // now we can get our found_next by subtracting gid_first from gid 
-    // and using it to index our current array
-    found[gid].s1 = current[gid - gid_first];
+    // output our results
+    found[gid].s0 = prev;
+    found[gid].s1 = next;
 }
 
 kernel void mark_new_or_increment_count(
@@ -128,7 +131,7 @@ kernel void mark_new_or_increment_count(
     long found_count
 ) {
     const long gid = get_global_id(0);
-    if(gid > total)
+    if(gid >= total)
         return;
 
     // we are looking at all our existing nodes and marking
@@ -138,10 +141,10 @@ kernel void mark_new_or_increment_count(
     value.s1 = nexts[gid];
 
     long low = lower_bound2(value, found, found_count);
-    if(equal(found[low], value))
+    if(equal(found[low], value)) {
+        scratch[low] = 0;
         count[gid]++;
-    else
-        scratch[low] = 1;
+    }
 }
 
 kernel void initialize_newly_found_sequences(
@@ -155,7 +158,7 @@ kernel void initialize_newly_found_sequences(
     long previous_total
 ) {
     const long gid = get_global_id(0);
-    if(gid > new_total) 
+    if(gid >= new_total) 
         return;
 
     long p = found[new_indices[gid]].s0;
