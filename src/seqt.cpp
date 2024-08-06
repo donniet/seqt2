@@ -19,17 +19,20 @@ long seqt::get_char_index(wchar_t c) {
         _tracked.resize(_total, _queue);
 
         fill_n(_lengths.begin() + index, 1, 1, _queue);
+
+        // atoms have prev[i] and next[i] == 0
         fill_n(_nexts.begin() + index, 1, 0, _queue);
         fill_n(_prevs.begin() + index, 1, 0, _queue);
 
-        fill_n(_counts.begin() + index, 1, 1, _queue);
+        fill_n(_counts.begin() + index, 1, 0, _queue); // initialize count to zero because we haven't tracked this yet
         fill_n(_tracked.begin() + index, 1, 1, _queue); // initialize tracked to a >0 value
     } else {
         index = i->second;// increment the count
 
-        long c;
-        copy_n(_counts.begin() + index, 1, &c, _queue);
-        fill_n(_counts.begin() + index, 1, c + 1, _queue);
+        // don't update the count here, we'll do it in the main read loop
+        // long c;
+        // copy_n(_counts.begin() + index, 1, &c, _queue);
+        // fill_n(_counts.begin() + index, 1, c + 1, _queue);
     }
 
     return index;
@@ -176,75 +179,6 @@ void seqt::read(wchar_t c) {
 
     // of all the sequences we are tracking that aren't followed by this character, create new sequences
 
-}
-
-std::wstring seqt::write_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
-    std::map<long, std::wstring> & cache)
-{
-    std::wstring str;
-
-    // index 0 is always the empty string
-    if(i == 0) 
-        return str;
-    
-    auto j = cache.find(i);
-    if(j != cache.end()) {
-        return j->second;
-    }
-
-    // atom
-    if(prev[i] == 0 && next[i] == 0) {
-        wchar_t c = _index_char[i];
-        str.resize(1);
-        str[0] = c;
-        cache[i] = str;
-        return str;
-    }
-
-    std::wstring p, n;
-
-    // TODO: make this stack based instead of recursive later
-    p = write_by_index(prev[i], prev, next, cache);
-    n = write_by_index(next[i], prev, next, cache);
-
-    str = p + n;
-    cache[i] = str;
-    return str;
-}
-
-void seqt::print_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
-    std::map<long, std::wstring> & cache) 
-{
-    std::wstring str;
-
-    auto j = cache.find(i);
-
-    if(j == cache.end()) {
-        std::wstring str = write_by_index(i, prev, next, cache);
-        // cache.insert({i, str}); // shouldn't be needed....
-    } else {
-        str = j->second;
-    }
-
-    std::wcout << "\"" << str << "\"" << "\n";
-}
-
-void seqt::print_all() {
-    print(_prevs);
-    print(_nexts);
-
-    std::vector<long> prev(_total);
-    std::vector<long> next(_total);
-
-    copy(_prevs.begin(), _prevs.end(), prev.begin(), _queue);
-    copy(_nexts.begin(), _nexts.end(), next.begin(), _queue);
-
-    std::map<long, std::wstring> cache;
-
-    for(long i = 0; i < _total; i++) {
-        print_by_index(i, prev, next, cache);
-    }
-    std::cout << std::endl;
 }
 
 long seqt::increment_and_add_new_finds(vector<long2_> & found, long tracked_value) {
@@ -403,12 +337,13 @@ vector<long> seqt::pack(vector<long> & data, function<long(long)> pred) {
 }
 
 template<typename T>
-void seqt::print(vector<T> & v) {
+void seqt::print(std::wostream & os, vector<T> & v) {
     std::vector<T> d(v.size());
     copy(v.begin(), v.end(), d.begin(), _queue);
     
-    std::copy(d.begin(), d.end(), ostream_iterator<T>(cout, ","));
-    cout << endl;
+    const wchar_t delim[] = {',', '\0'};
+    std::copy(d.begin(), d.end(), ostream_iterator<T, wchar_t>(os, delim));
+    os << endl;
 }
 
 
@@ -442,4 +377,81 @@ seqt::seqt() :
     _make_pair_constant_second_kernel = _program.create_kernel("make_pair_constant_second");
 
     get_char_index(0);
+}
+
+
+std::wstring seqt::write_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
+    std::map<long, std::wstring> & cache)
+{
+    std::wstring str;
+
+    // index 0 is always the empty string
+    if(i == 0) 
+        return str;
+    
+    auto j = cache.find(i);
+    if(j != cache.end()) {
+        return j->second;
+    }
+
+    // atom
+    if(prev[i] == 0 && next[i] == 0) {
+        wchar_t c = _index_char[i];
+        str.resize(1);
+        str[0] = c;
+
+        // std::wcout << "atom: " << i << " " << str << endl;
+        cache[i] = str;
+        return str;
+    }
+
+    std::wstring p, n;
+
+    // TODO: make this stack based instead of recursive later
+    p = write_by_index(prev[i], prev, next, cache);
+    n = write_by_index(next[i], prev, next, cache);
+
+    str = p + n;
+    cache[i] = str;
+    // std::wcout << "found: " << i << " " << str << endl;
+    return str;
+}
+
+void seqt::print_by_index(std::wostream & os, long i, std::vector<long> const & prev, std::vector<long> const & next,
+    std::map<long, std::wstring> & cache) 
+{
+    std::wstring str;
+
+    auto j = cache.find(i);
+
+    if(j == cache.end()) {
+        str = write_by_index(i, prev, next, cache);
+        // cache.insert({i, str}); // shouldn't be needed....
+    } else {
+        str = j->second;
+    }
+
+
+    os << "\"" << str << "\"" << "\n";
+}
+
+void seqt::print_all(std::wostream & os) {
+    os << "printing: " << endl;
+    // print(os, _prevs);
+    // print(os, _nexts);
+
+    std::vector<long> prev(_total);
+    std::vector<long> next(_total);
+    std::vector<long> counts(_total);
+
+    copy(_prevs.begin(), _prevs.end(), prev.begin(), _queue);
+    copy(_nexts.begin(), _nexts.end(), next.begin(), _queue);
+    copy(_counts.begin(), _counts.end(), counts.begin(), _queue);
+
+    std::map<long, std::wstring> cache;
+
+    for(long i = 0; i < _total; i++) {
+        print_by_index(os, i, prev, next, cache);
+    }
+    os << std::endl;
 }

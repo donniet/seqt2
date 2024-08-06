@@ -80,13 +80,13 @@ int main(void)
 
     seqt s;
 
-    std::string test = "blahblahblahblah";
+    std::string test = "ababab";
 
 
     for(auto c : test) {
         s.read(c);
     }
-    s.print_all();
+    s.print_all(wcout);
 
     for(;;) {
         c = wcin.get();

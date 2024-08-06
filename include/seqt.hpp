@@ -13,7 +13,7 @@
 using namespace boost::compute;
 
 using std::map;
-using std::ostream, std::cout, std::cerr, std::endl;
+using std::ostream, std::wostream, std::cout, std::cerr, std::endl;
 using std::ostream_iterator;
 
 
@@ -29,7 +29,7 @@ long calc_operational_size(long global_size, long local_size);
 //     os << "(" << 
 // }
 
-class seqt {
+class seqt { 
 public:
     device _device;
     context _context;
@@ -73,12 +73,12 @@ public:
     long increment_and_add_new_finds(vector<long2_> & found, long tracked_value);
 
     template<typename T>
-    void print(vector<T> & v); 
+    void print(std::wostream & os, vector<T> & v); 
 
     void read(wchar_t c);
-    void print_all();
+    void print_all(std::wostream & os);
 
-    void print_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
+    void print_by_index(std::wostream & os, long i, std::vector<long> const & prev, std::vector<long> const & next,
         std::map<long, std::wstring> & cache);
     std::wstring write_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
         std::map<long, std::wstring> & cache);
