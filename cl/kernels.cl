@@ -110,8 +110,14 @@ kernel void collect_finds(
     // the length of the next finds
     long prev = upper_bound(gid, scratch, total);
     
-    long first_find = scratch[prev-1]; // will prev always be > 0?
-
+    // prev == 0 means that index 0 (our begin token)
+    // has at least one next (scratch[0] > 0 where
+    // scratch is a scan of the lengths of nexts)
+    // in this case our "first_find" should be 0
+    long first_find = 0;
+    if(prev > 0) 
+        first_find = scratch[prev-1];
+    
     // our next is the offset of where our nexts begin
     // by our gid from the first find
     long next = current[nexts_begin[prev] + gid - first_find];
@@ -155,6 +161,7 @@ kernel void initialize_newly_found_sequences(
     global long * prevs,
     global long * nexts,
     global long * tracked,
+    long tracked_value,
     long previous_total
 ) {
     const long gid = get_global_id(0);
@@ -168,7 +175,16 @@ kernel void initialize_newly_found_sequences(
     lengths[new_index] = lengths[p] + lengths[n];
     prevs[new_index] = p;
     nexts[new_index] = n;
-    tracked[new_index] = 0;
+    tracked[new_index] = tracked_value;
+}
+
+kernel void make_pair_constant_second(global long * first, long second, global long2 * output, long total) {
+    const long gid = get_global_id(0);
+    if(gid >= total)
+        return;
+
+    output[gid].s0 = first[gid];
+    output[gid].s1 = second;
 }
 
 kernel void pack(long total, global long *scanned, global long *output) {

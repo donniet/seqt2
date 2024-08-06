@@ -40,6 +40,7 @@ public:
     kernel _collect_finds_kernel;
     kernel _mark_new_or_increment_count_kernel;
     kernel _initialize_newly_found_sequences_kernel;
+    kernel _make_pair_constant_second_kernel;
 
     vector<long> _counts; // how many times have we seen this?
 
@@ -66,7 +67,10 @@ public:
     void find_nexts(vector<long> & sorted_lengths, vector<long> & nexts_begin, vector<long> & nexts_end);
     void collect_finds(vector<long> & nexts_begin, vector<long> & scratch, vector<long> & current, vector<long2_> & found);
     void mark_new_or_increment_count(vector<long2_> & found, vector<long> & scratch);
-    void initialize_newly_found_sequences(vector<long> & new_find_indices, vector<long2_> & found);
+    void initialize_newly_found_sequences(vector<long> & new_find_indices, vector<long2_> & found, long tracked_value);
+    vector<long2_> make_pair_constant_second(vector<long> & first, long second);
+
+    long increment_and_add_new_finds(vector<long2_> & found, long tracked_value);
 
     template<typename T>
     void print(vector<T> & v); 
