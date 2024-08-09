@@ -36,17 +36,17 @@ public:
     command_queue _queue;
     program _program;
     kernel _pack_kernel;
+    kernel _scatter_value_kernel;
     kernel _find_nexts_kernel;
     kernel _collect_finds_kernel;
-    kernel _mark_new_or_increment_count_kernel;
+    kernel _mark_exists_kernel;
     kernel _initialize_newly_found_sequences_kernel;
     kernel _make_pair_constant_second_kernel;
 
     vector<long> _counts; // how many times have we seen this?
 
     vector<long> _lengths; // for sequences
-    vector<long> _nexts; // for sequences
-    vector<long> _prevs; // for sequences
+    vector<long2_> _seqs; // for sequences
 
     // vector<long> _depths; // for sets;
     // vector<long> _lefts; // for sets
@@ -64,13 +64,15 @@ public:
     long get_char_index(wchar_t c);
 
     vector<long> pack(vector<long> & data, function<long(long)> pred);
-    void find_nexts(vector<long> & sorted_lengths, vector<long> & nexts_begin, vector<long> & nexts_end);
-    void collect_finds(vector<long> & nexts_begin, vector<long> & scratch, vector<long> & current, vector<long2_> & found);
-    void mark_new_or_increment_count(vector<long2_> & found, vector<long> & scratch);
+    void scatter_value(vector<long> & indices, long value, vector<long> & output);
+    void find_nexts(vector<long> & sorted_lengths, vector<long2_> & nexts); 
+    void collect_finds(vector<long2_> & nexts_begin, vector<long> & scratch, vector<long> & current, vector<long2_> & found);
+    void mark_exists(vector<long2_> & found, vector<long> & scratch);
     void initialize_newly_found_sequences(vector<long> & new_find_indices, vector<long2_> & found, long tracked_value);
+    vector<long2_> find_nexts_by_length(vector<long> & current);
     vector<long2_> make_pair_constant_second(vector<long> & first, long second);
 
-    long increment_and_add_new_finds(vector<long2_> & found, long tracked_value);
+    long add_new_finds(vector<long> & new_find_indices, vector<long2_> & found, long tracked_value);
 
     template<typename T>
     void print(std::wostream & os, vector<T> & v); 
@@ -78,10 +80,11 @@ public:
     void read(wchar_t c);
     void print_all(std::wostream & os);
 
-    void print_by_index(std::wostream & os, long i, std::vector<long> const & prev, std::vector<long> const & next,
+    void print_by_index(std::wostream & os, long i, std::vector<long2_> const & seqs,
+        std::vector<long> const & counts, std::map<long, std::wstring> & cache);
+    std::wstring write_by_index(long i, std::vector<long2_> const & seqs,
         std::map<long, std::wstring> & cache);
-    std::wstring write_by_index(long i, std::vector<long> const & prev, std::vector<long> const & next,
-        std::map<long, std::wstring> & cache);
+        
     seqt();
 }; 
 

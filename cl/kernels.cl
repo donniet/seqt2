@@ -71,8 +71,7 @@ kernel void find_nexts(
     long total,
     global long * sorted_current_lengths,
     long current_total,
-    global long * nexts_begin,
-    global long * nexts_end) 
+    global long2 * nexts)
 {
     const long gid = get_global_id(0);
     if(gid >= total)
@@ -82,14 +81,14 @@ kernel void find_nexts(
     long search_length = -tracked[gid];
 
     // do a binary search through the sorted currents for search_length
-    nexts_begin[gid] = lower_bound(search_length, sorted_current_lengths, current_total);
-    nexts_end[gid] = upper_bound(search_length, sorted_current_lengths, current_total);
+    nexts[gid].s0 = lower_bound(search_length, sorted_current_lengths, current_total);
+    nexts[gid].s1 = upper_bound(search_length, sorted_current_lengths, current_total);
     // nexts_begin[gid] = 0;
     // nexts_end[gid] = 1;
 }
 
 kernel void collect_finds(
-    global long * nexts_begin,
+    global long2 * nexts,
     global long * scratch,
     long total,
     global long * current,
@@ -120,17 +119,28 @@ kernel void collect_finds(
     
     // our next is the offset of where our nexts begin
     // by our gid from the first find
-    long next = current[nexts_begin[prev] + gid - first_find];
+    long next = current[nexts[prev].s0 + gid - first_find];
 
     // output our results
     found[gid].s0 = prev;
     found[gid].s1 = next;
 }
 
-kernel void mark_new_or_increment_count(
-    global long * prevs,
-    global long * nexts,
-    global long * count,
+kernel void scatter_value(
+    global long * indices,
+    long total_indices,
+    long value,
+    global long * output)
+{
+    const long gid = get_global_id(0);
+    if(gid >= total_indices)
+        return;
+
+    output[indices[gid]] = value;
+}
+
+kernel void mark_exists(
+    global long2 * seqs,
     long total,
     global long2 * found,
     global long * scratch,
@@ -142,14 +152,11 @@ kernel void mark_new_or_increment_count(
 
     // we are looking at all our existing nodes and marking
     // scratch if this one exists in found
-    long2 value;
-    value.s0 = prevs[gid];
-    value.s1 = nexts[gid];
+    long2 value = seqs[gid];
 
     long low = lower_bound2(value, found, found_count);
     if(equal(found[low], value)) {
-        scratch[low] = 0;
-        count[gid]++;
+        scratch[low] = gid;
     }
 }
 
@@ -158,9 +165,9 @@ kernel void initialize_newly_found_sequences(
     long new_total,
     global long2 * found,
     global long * lengths,
-    global long * prevs,
-    global long * nexts,
+    global long2 * seqs,
     global long * tracked,
+    global long * counts,
     long tracked_value,
     long previous_total
 ) {
@@ -168,13 +175,12 @@ kernel void initialize_newly_found_sequences(
     if(gid >= new_total) 
         return;
 
-    long p = found[new_indices[gid]].s0;
-    long n = found[new_indices[gid]].s1;
+    long2 s = found[new_indices[gid]];
 
     long new_index = previous_total + gid;
-    lengths[new_index] = lengths[p] + lengths[n];
-    prevs[new_index] = p;
-    nexts[new_index] = n;
+    lengths[new_index] = lengths[s.s0] + lengths[s.s1];
+    seqs[new_index] = s;
+    counts[new_index] = 0;
     tracked[new_index] = tracked_value;
 }
 
