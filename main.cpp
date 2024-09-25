@@ -47,6 +47,7 @@ using std::endl;
 using std::istream;
 using std::wcin;
 using std::wcout;
+using std::wifstream;
 
 void init_locale(void)
 // Does magic so that wcout can work.
@@ -59,7 +60,7 @@ void init_locale(void)
     _setmode(_fileno(stdin), _O_WTEXT);
 #else
     // The correct locale name may vary by OS, e.g., "en_US.utf8".
-    constexpr char locale_name[] = "";
+    constexpr char locale_name[] = "en_US.utf8";
     setlocale(LC_ALL, locale_name);
     std::locale::global(std::locale(locale_name));
     wcout.imbue(std::locale());
@@ -71,7 +72,7 @@ void init_locale(void)
 
 #include <string>
 
-int main(void)
+int main(int ac, char ** av)
 {
     init_locale();
 
@@ -80,20 +81,33 @@ int main(void)
 
     seqt s;
 
-    std::string test = "ababab";
-
-
+#if USE_SIMPLE_DATA 
+    std::string test = "abaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabababaababaababaababaababaabab";
     for(auto c : test) {
         s.read(c);
     }
-    s.print_all(wcout);
+#endif
 
-    for(;;) {
-        c = wcin.get();
+    if(ac > 1) {    
+        wifstream f(av[1]);
 
-        if(c == eof) 
-            break;
+        for(int i = 0;; i++) {
+            c = f.get();
+
+            s.read(c);
+
+            if(i % 10 == 0) {
+                wcout << ".";
+                wcout.flush();
+            }
+
+            if(c == eof) 
+                break;
+        }
+        wcout << endl;
     }
+
+    s.print_all(wcout);
 
     return EXIT_SUCCESS;
 }
